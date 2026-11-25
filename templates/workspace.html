@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>智能图像处理工作台</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-color: #06b6d4;
+            --border-color: #334155;
+        }
+        body { background-color: var(--bg-color); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; overflow-x: hidden; }
+        .navbar { background: rgba(30, 41, 59, 0.8) !important; backdrop-filter: blur(10px); border-bottom: 1px solid var(--border-color); }
+        .navbar-brand { font-weight: 700; color: var(--accent-color) !important; }
+        .sidebar { background-color: var(--panel-bg); border-right: 1px solid var(--border-color); height: calc(100vh - 56px); overflow-y: auto; padding-bottom: 20px; }
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .menu-category { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; margin: 20px 0 10px 15px; font-weight: 600; }
+        .algo-btn { background-color: transparent; color: var(--text-main); border: 1px solid transparent; border-radius: 8px; margin: 2px 10px; padding: 10px 15px; text-align: left; transition: all 0.2s; width: calc(100% - 20px); font-size: 0.95rem; }
+        .algo-btn i { margin-right: 10px; width: 20px; text-align: center; color: var(--text-muted); }
+        .algo-btn:hover { background-color: rgba(6, 182, 212, 0.1); color: var(--accent-color); }
+        .algo-btn.active { background-color: rgba(6, 182, 212, 0.15); border-color: rgba(6, 182, 212, 0.3); color: var(--accent-color); font-weight: 600; box-shadow: inset 4px 0 0 var(--accent-color); }
+        .workspace-area { padding: 20px; }
+        .image-container { position: relative; background-color: #0b1120; border: 1px solid var(--border-color); border-radius: 12px; min-height: 400px; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: inset 0 4px 20px rgba(0,0,0,0.5); }
+        .image-container img { max-width: 100%; max-height: 600px; object-fit: contain; border-radius: 4px; }
+        .panel-title { font-size: 1rem; color: var(--text-muted); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .control-panel { background-color: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-top: 20px; }
+        .param-group { display: none; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .param-group.active { display: flex; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .form-range::-webkit-slider-thumb { background: var(--accent-color); }
+        .form-select, .form-control { background-color: #0f172a; border: 1px solid var(--border-color); color: var(--text-main); }
+        .form-select:focus, .form-control:focus { background-color: #0f172a; color: var(--text-main); border-color: var(--accent-color); }
+        .btn-process { background: linear-gradient(135deg, var(--accent-color), #3b82f6); color: white; border: none; font-weight: 600; padding: 12px 30px; border-radius: 8px; transition: all 0.3s; }
+        .btn-process:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(6, 182, 212, 0.6); color: white; }
+        .btn-outline-custom { border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; }
+        .btn-outline-custom:hover { background-color: var(--panel-bg); color: var(--accent-color); }
+        .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 10; }
+        .spinner { width: 50px; height: 50px; border: 4px solid rgba(6, 182, 212, 0.3); border-top-color: var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .badge-time { background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }
+        .slider-wrapper { display: flex; flex-direction: column; justify-content: center; position: relative; }
+        .slider-wrapper input[type="range"] { margin-bottom: 0; }
+        .ticks-container { display: flex; justify-content: space-between; padding: 0 8px; margin-top: 2px; pointer-events: none; }
+        .tick { width: 4px; height: 4px; background-color: #64748b; border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand"><i class="fa-solid fa-layer-group me-2"></i>智能图像处理工作台</span>
+            <a href="/" class="btn btn-outline-custom btn-sm px-3"><i class="fa-solid fa-arrow-up-from-bracket me-2"></i>重新上传</a>
+        </div>
+    </nav>
+
+    <div class="container-fluid p-0">
+        <div class="row g-0">
+            <div class="col-md-2 sidebar pt-2">
+                <div class="menu-category">1. 基本运算</div>
+                <button class="algo-btn active" data-algo="translate"><i class="fa-solid fa-arrows-up-down-left-right"></i>几何平移</button>
+                <button class="algo-btn" data-algo="rotate"><i class="fa-solid fa-rotate-right"></i>几何旋转</button>
+                <button class="algo-btn" data-algo="scale"><i class="fa-solid fa-expand"></i>几何缩放</button>
+                <button class="algo-btn" data-algo="flip"><i class="fa-solid fa-left-right"></i>几何镜像</button>
+                <button class="algo-btn" data-algo="shear"><i class="fa-solid fa-sliders"></i>几何剪切</button>
+                <button class="algo-btn" data-algo="arithmetic_add"><i class="fa-solid fa-plus-minus"></i>代数加法 (亮度)</button>
+
+                <div class="menu-category">2. 图像增强</div>
+                <button class="algo-btn" data-algo="gamma"><i class="fa-solid fa-sun"></i>灰度变换 (Gamma)</button>
+                <button class="algo-btn" data-algo="hist_eq"><i class="fa-solid fa-chart-area"></i>直方图均衡化</button>
+                <button class="algo-btn" data-algo="laplacian_sharpen"><i class="fa-solid fa-wand-magic"></i>拉普拉斯锐化</button>
+
+                <div class="menu-category">3. 图像平滑</div>
+                <button class="algo-btn" data-algo="mean_blur"><i class="fa-solid fa-droplet"></i>均值滤波</button>
+                <button class="algo-btn" data-algo="median_blur"><i class="fa-solid fa-band-aid"></i>中值滤波</button>
+                <button class="algo-btn" data-algo="gaussian_blur"><i class="fa-brands fa-blender"></i>高斯滤波</button>
+                <button class="algo-btn" data-algo="fft_lowpass"><i class="fa-solid fa-wave-square"></i>频率低通滤波</button>
+
+                <div class="menu-category">4. 图像分割</div>
+                <button class="algo-btn" data-algo="canny"><i class="fa-solid fa-border-all"></i>边缘 (Canny)</button>
+                <button class="algo-btn" data-algo="sobel"><i class="fa-solid fa-border-top-left"></i>边缘 (Sobel)</button>
+                <button class="algo-btn" data-algo="otsu"><i class="fa-solid fa-circle-half-stroke"></i>阈值 (Otsu)</button>
+                <button class="algo-btn" data-algo="adaptive_thresh"><i class="fa-solid fa-mosaic"></i>自适应阈值</button>
+                <button class="algo-btn" data-algo="watershed"><i class="fa-solid fa-water"></i>区域 (分水岭)</button>
+                <button class="algo-btn" data-algo="kmeans_region"><i class="fa-solid fa-layer-group"></i>区域 (K-Means)</button>
+            </div>
+
+            <div class="col-md-10 workspace-area">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="panel-title"><span><i class="fa-regular fa-image me-2"></i>原始图像</span></div>
+                        <div class="image-container"><img src="/static/uploads/{{ image }}" alt="原图"></div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <div class="panel-title">
+                            <span><i class="fa-solid fa-wand-magic-sparkles me-2"></i>处理结果</span>
+                            <div>
+                                <span id="time-display" class="badge badge-time d-none me-2">耗时: 0 ms</span>
+                                <a href="#" id="download-btn" class="btn btn-outline-custom btn-sm d-none"><i class="fa-solid fa-download me-1"></i> 下载</a>
+                            </div>
+                        </div>
+                        <div class="image-container">
+                            <div class="loading-overlay" id="loading-overlay"><div class="spinner"></div></div>
+                            <span id="placeholder-text" class="text-white fst-italic"><i class="fa-solid fa-arrow-right me-2"></i>请在下方选择参数并执行处理</span>
+                            <img id="result-img" src="" alt="结果图" class="d-none">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-panel d-flex align-items-center justify-content-between flex-wrap gap-3">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <h6 class="mb-0 me-4 text-info" style="min-width: 80px;"><i class="fa-solid fa-sliders me-2"></i>参数区</h6>
+                        
+                        <div id="params-area" class="w-100">
+                            <div id="param-translate" class="param-group active">
+                                <label class="fw-bold text-light">X 轴偏移:</label>
+                                <input type="range" class="form-range w-25" id="tx-input" min="-200" max="200" value="50" step="10">
+                                <span id="tx-val" class="badge bg-secondary fs-6">50</span>
+                                <label class="fw-bold text-light ms-3">Y 轴偏移:</label>
+                                <input type="range" class="form-range w-25" id="ty-input" min="-200" max="200" value="50" step="10">
+                                <span id="ty-val" class="badge bg-secondary fs-6">50</span>
+                            </div>
+
+                            <div id="param-arithmetic_add" class="param-group">
+                                <label class="fw-bold text-light">亮度增减值:</label>
+                                <input type="range" class="form-range w-50" id="value-input" min="-100" max="100" value="50" step="10">
+                                <span id="value-val" class="badge bg-secondary fs-6">50</span>
+                            </div>
+
+                            <div id="param-gamma" class="param-group">
+                                <label class="fw-bold text-light">Gamma 系数:</label>
+                                <input type="range" class="form-range w-50" id="gamma-input" min="0.1" max="3.0" value="1.5" step="0.1">
+                                <span id="gamma-val" class="badge bg-secondary fs-6">1.5</span>
+                            </div>
+
+                            <div id="param-hist_eq" class="param-group"><span class="text-white">自动拉伸直方图，无需参数。</span></div>
+
+                            <div id="param-laplacian_sharpen" class="param-group">
+                                <label class="fw-bold text-light">锐化强度系数:</label>
+                                <input type="range" class="form-range w-50" id="strength-input" min="0.5" max="3.0" value="1.0" step="0.5">
+                                <span id="strength-val" class="badge bg-secondary fs-6">1.0</span>
+                            </div>
+
+                            <div id="param-rotate" class="param-group">
+                                <label class="fw-bold text-light">旋转角度:</label>
+                                <input type="range" class="form-range w-50" id="angle-input" min="0" max="360" value="45" step="1">
+                                <span id="angle-val" class="badge bg-secondary fs-6">45°</span>
+                            </div>
+
+                            <div id="param-scale" class="param-group">
+                                <label class="fw-bold text-light">缩放比例:</label>
+                                <input type="range" class="form-range w-50" id="scale-input" min="0.1" max="2.0" value="0.5" step="0.1">
+                                <span id="scale-val" class="badge bg-secondary fs-6">0.5x</span>
+                            </div>
+
+                            <div id="param-flip" class="param-group">
+                                <label class="fw-bold text-light">镜像模式:</label>
+                                <select class="form-select w-25" id="flip-input">
+                                    <option value="1">水平翻转</option><option value="0">垂直翻转</option><option value="-1">水平+垂直</option>
+                                </select>
+                            </div>
+
+                            <div id="param-shear" class="param-group">
+                                <label class="fw-bold text-light">X轴剪切度:</label>
+                                <input type="range" class="form-range w-25" id="shearx-input" min="0.0" max="0.8" value="0.2" step="0.1">
+                                <span id="shearx-val" class="badge bg-secondary fs-6">0.2</span>
+                                <label class="fw-bold text-light ms-3">Y轴剪切度:</label>
+                                <input type="range" class="form-range w-25" id="sheary-input" min="0.0" max="0.8" value="0.0" step="0.1">
+                                <span id="sheary-val" class="badge bg-secondary fs-6">0.0</span>
+                            </div>
+
+                            <div id="param-mean_blur" class="param-group">
+                                <label class="fw-bold text-light">滤波核大小:</label>
+                                <select class="form-select w-25 ksize-select"><option value="3">3 x 3</option><option value="5">5 x 5</option><option value="7">7 x 7</option><option value="9">9 x 9</option></select>
+                            </div>
+                            
+                            <div id="param-median_blur" class="param-group">
+                                <label class="fw-bold text-light">滤波核大小:</label>
+                                <select class="form-select w-25 ksize-select"><option value="3">3 x 3</option><option value="5">5 x 5</option><option value="7">7 x 7</option><option value="9">9 x 9</option></select>
+                            </div>
+
+                            <div id="param-gaussian_blur" class="param-group">
+                                <label class="fw-bold text-light">滤波核大小:</label>
+                                <select class="form-select w-25 ksize-select"><option value="3">3 x 3</option><option value="5">5 x 5</option><option value="7">7 x 7</option><option value="9">9 x 9</option></select>
+                            </div>
+
+                            <div id="param-fft_lowpass" class="param-group">
+                                <label class="fw-bold text-light">截止频率半径:</label>
+                                <input type="range" class="form-range w-50" id="d0-input" min="5" max="100" value="30" step="5">
+                                <span id="d0-val" class="badge bg-secondary fs-6">30</span>
+                            </div>
+
+                            <div id="param-canny" class="param-group">
+                                <label class="fw-bold text-light">低阈值:</label>
+                                <input type="range" class="form-range w-25" id="low-input" min="0" max="255" value="50" step="5">
+                                <span id="low-val" class="badge bg-secondary fs-6">50</span>
+                                <label class="fw-bold text-light ms-3">高阈值:</label>
+                                <input type="range" class="form-range w-25" id="high-input" min="0" max="255" value="150" step="5">
+                                <span id="high-val" class="badge bg-secondary fs-6">150</span>
+                            </div>
+
+                            <div id="param-sobel" class="param-group">
+                                <label class="fw-bold text-light">Sobel 核大小 (Kernel Size):</label>
+                                <select class="form-select w-25" id="sobel-ksize-input">
+                                    <option value="1">1 x 1</option><option value="3" selected>3 x 3</option><option value="5">5 x 5</option><option value="7">7 x 7</option>
+                                </select>
+                            </div>
+
+                            <div id="param-otsu" class="param-group"><span class="text-white">自动计算全局最佳阈值，无需参数。</span></div>
+
+                            <div id="param-adaptive_thresh" class="param-group">
+                                <label class="fw-bold text-light">邻域块大小:</label>
+                                <input type="range" class="form-range w-25" id="block-input" min="3" max="31" value="11" step="2">
+                                <span id="block-val" class="badge bg-secondary fs-6">11</span>
+                                <label class="fw-bold text-light ms-3">常数 C:</label>
+                                <input type="range" class="form-range w-25" id="c-input" min="0" max="10" value="2" step="1">
+                                <span id="c-val" class="badge bg-secondary fs-6">2</span>
+                            </div>
+
+                            <div id="param-watershed" class="param-group"><span class="text-white">基于形态学与距离变换的自动分水岭分割。</span></div>
+
+                            <div id="param-kmeans_region" class="param-group">
+                                <label class="fw-bold text-light">分割区域数量 (K值):</label>
+                                <input type="range" class="form-range w-50" id="k-input" min="2" max="8" value="3" step="1">
+                                <span id="k-val" class="badge bg-secondary fs-6">3</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="process-btn" class="btn btn-process"><i class="fa-solid fa-play me-2"></i>执行处理</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAlgorithm = 'translate';
+        window.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('input[type="range"].form-range').forEach(input => {
+                const min = parseFloat(input.min), max = parseFloat(input.max), step = parseFloat(input.step) || 1;
+                const count = Math.floor((max - min) / step) + 1;
+                if (count >= 2 && count <= 20) {
+                    const wrapper = document.createElement('div'); wrapper.className = 'slider-wrapper';
+                    let widthClass = input.classList.contains('w-50') ? 'w-50' : (input.classList.contains('w-25') ? 'w-25' : 'w-100');
+                    wrapper.classList.add(widthClass); input.classList.remove('w-50', 'w-25'); input.classList.add('w-100');
+                    input.parentNode.insertBefore(wrapper, input); wrapper.appendChild(input);
+                    const tickContainer = document.createElement('div'); tickContainer.className = 'ticks-container';
+                    for (let i = 0; i < count; i++) { const tick = document.createElement('div'); tick.className = 'tick'; tickContainer.appendChild(tick); }
+                    wrapper.appendChild(tickContainer);
+                }
+            });
+        });
+
+        document.querySelectorAll('.algo-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active')); this.classList.add('active');
+                currentAlgorithm = this.dataset.algo;
+                document.querySelectorAll('.param-group').forEach(g => g.classList.remove('active'));
+                const activeParam = document.getElementById('param-' + currentAlgorithm);
+                if (activeParam) activeParam.classList.add('active');
+            });
+        });
+
+        const bindSlider = (id, displayId, suffix) => {
+            const input = document.getElementById(id);
+            if(input) input.addEventListener('input', function() { document.getElementById(displayId).textContent = this.value + suffix; });
+        };
+        bindSlider('value-input', 'value-val', '');
+        bindSlider('gamma-input', 'gamma-val', '');
+        bindSlider('strength-input', 'strength-val', '');
+        bindSlider('tx-input', 'tx-val', '');
+        bindSlider('ty-input', 'ty-val', '');
+        bindSlider('angle-input', 'angle-val', '°');
+        bindSlider('scale-input', 'scale-val', 'x');
+        bindSlider('shearx-input', 'shearx-val', '');
+        bindSlider('sheary-input', 'sheary-val', '');
+        bindSlider('d0-input', 'd0-val', '');
+        bindSlider('low-input', 'low-val', '');
+        bindSlider('high-input', 'high-val', '');
+        bindSlider('block-input', 'block-val', '');
+        bindSlider('c-input', 'c-val', '');
+        bindSlider('k-input', 'k-val', '');
+
+        document.getElementById('process-btn').addEventListener('click', function() {
+            const btn = this; const originalBtnHtml = btn.innerHTML;
+            btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>处理中...';
+            document.getElementById('loading-overlay').style.display = 'flex';
+
+            const payload = { algorithm: currentAlgorithm };
+            if (currentAlgorithm === 'translate') { payload.tx = document.getElementById('tx-input').value; payload.ty = document.getElementById('ty-input').value; }
+            else if (currentAlgorithm === 'arithmetic_add') payload.value = document.getElementById('value-input').value;
+            else if (currentAlgorithm === 'gamma') payload.gamma = document.getElementById('gamma-input').value;
+            else if (currentAlgorithm === 'laplacian_sharpen') payload.strength = document.getElementById('strength-input').value;
+            else if (currentAlgorithm === 'rotate') payload.angle = document.getElementById('angle-input').value;
+            else if (currentAlgorithm === 'scale') payload.scale = document.getElementById('scale-input').value;
+            else if (currentAlgorithm === 'flip') payload.flip_code = document.getElementById('flip-input').value;
+            else if (currentAlgorithm === 'shear') { payload.shear_x = document.getElementById('shearx-input').value; payload.shear_y = document.getElementById('sheary-input').value; }
+            else if (['mean_blur', 'median_blur', 'gaussian_blur'].includes(currentAlgorithm)) { payload.ksize = document.getElementById('param-' + currentAlgorithm).querySelector('.ksize-select').value; }
+            else if (currentAlgorithm === 'fft_lowpass') payload.d0 = document.getElementById('d0-input').value;
+            else if (currentAlgorithm === 'canny') { payload.low = document.getElementById('low-input').value; payload.high = document.getElementById('high-input').value; }
+            else if (currentAlgorithm === 'sobel') payload.ksize = document.getElementById('sobel-ksize-input').value;
+            else if (currentAlgorithm === 'adaptive_thresh') { payload.block_size = document.getElementById('block-input').value; payload.c = document.getElementById('c-input').value; }
+            else if (currentAlgorithm === 'kmeans_region') payload.k = document.getElementById('k-input').value;
+
+            fetch('/process', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const resultImg = document.getElementById('result-img');
+                    resultImg.src = data.result_url + '?t=' + new Date().getTime(); resultImg.classList.remove('d-none');
+                    document.getElementById('placeholder-text').classList.add('d-none');
+                    document.getElementById('download-btn').href = '/download/' + data.download_name;
+                    document.getElementById('download-btn').classList.remove('d-none');
+                    const timeDisplay = document.getElementById('time-display');
+                    timeDisplay.textContent = `耗时: ${data.time} ms`; timeDisplay.classList.remove('d-none');
+                } else alert('处理失败: ' + data.error);
+            })
+            .catch(error => alert('请求出错，请检查后台终端。'))
+            .finally(() => { btn.disabled = false; btn.innerHTML = originalBtnHtml; document.getElementById('loading-overlay').style.display = 'none'; });
+        });
+    </script>
+</body>
+</html>
